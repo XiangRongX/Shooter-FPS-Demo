@@ -4,12 +4,14 @@
 
 #include "CoreMinimal.h"
 #include "AIController.h"
-#include "Perception/AIPerceptionTypes.h"
 #include "ShooterAIController.generated.h"
+
+DECLARE_DELEGATE_TwoParams(FShooterPerceptionUpdatedDelegate, AActor*, const FAIStimulus&);
+DECLARE_DELEGATE_OneParam(FShooterPerceptionForgottenDelegate, AActor*);
 
 class UStateTreeAIComponent;
 class UAIPerceptionComponent;
-class UAISenseConfig_Sight;
+struct FAIStimulus;
 
 /**
  * 
@@ -23,18 +25,24 @@ public:
 	AShooterAIController();
 
 	void SetCurrentTarget(AActor* InTarget);
+	void ClearCurrentTarget();
 
-	FORCEINLINE AActor* GetCurrentTarget() const { return CurrentTarget; }
+	FORCEINLINE AActor* GetCurrentTarget() const { return TargetEnemy; }
+
+	FShooterPerceptionUpdatedDelegate OnShooterPerceptionUpdated;
+	FShooterPerceptionForgottenDelegate OnShooterPerceptionForgotten;
 
 protected:
-	virtual void BeginPlay() override;
 	virtual void OnPossess(APawn* InPawn) override;
 
 	UFUNCTION()
-	void OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus);
+	void OnPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus);
 
 	UFUNCTION()
-	void OnControlledPawnDeath();
+	void OnPerceptionForgotten(AActor* Actor);
+
+	UFUNCTION()
+	void OnPawnDeath();
 
 private:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI", meta = (AllowPrivateAccess = "true"))
@@ -44,12 +52,6 @@ private:
     TObjectPtr<UAIPerceptionComponent> AIPerceptionComponent;
 
     UPROPERTY()
-    TObjectPtr<UAISenseConfig_Sight> SightConfig;
-
-    UPROPERTY()
-    TObjectPtr<AActor> CurrentTarget;
-
-    UPROPERTY(EditAnywhere, Category = "AI")
-    FName EnemyTag = FName("Player");
+    TObjectPtr<AActor> TargetEnemy;
 	
 };

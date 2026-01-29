@@ -21,6 +21,7 @@ class SHOOTER_API AShooterPlayerController : public APlayerController
 
 public:
 	void SetHUDHealth(float Health, float MaxHealth);
+	void SetHUDShield(float Shield, float MaxShield);
 	void SetHUDScore(float Score);
 	void SetHUDDefeats(int32 Defeats);
 	void SetHUDWeaponAmmo(int32 Ammo);
@@ -90,9 +91,14 @@ private:
 	UPROPERTY()
 	TObjectPtr<UCharacterOverlay> CharacterOverlay;
 
-	bool bInitializeCharacterOverlay = false;
+	bool bInitializeHealth = false;
+	bool bInitializeShield = false;
+	bool bInitializeDefeats = false;
+	bool bInitializeScore = false;
 	float HUDHealth;
 	float HUDMaxHealth;
+	float HUDShield;
+	float HUDMaxShield;
 	float HUDScore;
 	int32 HUDDefeats;
 };

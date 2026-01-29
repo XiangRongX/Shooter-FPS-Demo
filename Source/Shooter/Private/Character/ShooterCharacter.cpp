@@ -11,6 +11,7 @@
 #include "Net/UnrealNetwork.h"
 #include "Weapon/Weapon.h"
 #include "ShooterComponent/CombatComponent.h"
+#include "ShooterComponent/BuffComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "Kismet/GameplayStatics.h"
@@ -21,6 +22,9 @@
 #include "TimerManager.h"
 #include "Character/ShooterPlayerState.h"
 #include "Weapon/WeaponTypes.h"
+#include "Perception/AIPerceptionStimuliSourceComponent.h"
+#include "Perception/AISense_Sight.h"
+#include "Enemy/ShooterAIController.h"
 
 AShooterCharacter::AShooterCharacter()
 {
@@ -35,7 +39,7 @@ AShooterCharacter::AShooterCharacter()
 	GetMesh()->SetCollisionObjectType(ECC_SkeletalMesh);
 
 	FirstPersonCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FirstPersonCamera"));
-	FirstPersonCamera->SetupAttachment(GetCapsuleComponent());
+	FirstPersonCamera->SetupAttachment(GetMesh());
 	FirstPersonCamera->SetRelativeLocation(FVector(-10.f, 0.f, 60.f));
 	FirstPersonCamera->bUsePawnControlRotation = true;
 
@@ -49,6 +53,9 @@ AShooterCharacter::AShooterCharacter()
 
 	CombatComponent = CreateDefaultSubobject<UCombatComponent>(TEXT("CombatComponent"));
 	CombatComponent->SetIsReplicated(true);
+
+	BuffComponent = CreateDefaultSubobject<UBuffComponent>(TEXT("BuffComponent"));
+	BuffComponent->SetIsReplicated(true);
 
 	GetCharacterMovement()->NavAgentProps.bCanCrouch = true;
 	TurningInPlace = ETurningInPlace::ETIP_NotTurning;
@@ -77,6 +84,7 @@ void AShooterCharacter::BeginPlay()
 	}*/
 
 	UpdateHUDHealth();
+	UpdateHUDShield();
 
 	if(HasAuthority())
 	{
@@ -108,6 +116,18 @@ void AShooterCharacter::UpdateHUDHealth()
 	}
 }
 
+void AShooterCharacter::UpdateHUDShield()
+{
+	if (ShooterPlayerController == nullptr)
+	{
+		ShooterPlayerController = Cast<AShooterPlayerController>(Controller);
+	}
+	if (ShooterPlayerController)
+	{
+		ShooterPlayerController->SetHUDShield(Shield, MaxShield);
+	}
+}
+
 void AShooterCharacter::PollInit()
 {
 	if (ShooterPlayerState == nullptr)
@@ -136,6 +156,7 @@ void AShooterCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 
 	DOREPLIFETIME_CONDITION(AShooterCharacter, OverlappingWeapon, COND_OwnerOnly);
 	DOREPLIFETIME(AShooterCharacter, Health);
+	DOREPLIFETIME(AShooterCharacter, Shield);
 }
 
 void AShooterCharacter::PostInitializeComponents()
@@ -145,6 +166,10 @@ void AShooterCharacter::PostInitializeComponents()
 	if(CombatComponent)
 	{
 		CombatComponent->Character = this;
+	}
+	if (BuffComponent)
+	{
+		BuffComponent->Character = this;
 	}
 }
 
@@ -157,6 +182,13 @@ void AShooterCharacter::PlayFireMontage(bool bAiming)
 	{
 		AnimInstance->Montage_Play(FireWeaponMontage);
 		FName SectionName = bAiming ? FName("RifleAim") : FName("RifleHip");
+		/*switch (CombatComponent->EquippedWeapon->GetWeaponType())
+		{
+		case EWeaponType::EWT_AssaultRifle:
+			SectionName = bAiming ? FName("RifleAim") : FName("RifleHip");
+		case EWeaponType::EWT_Pistol:
+			SectionName = bAiming ? FName("PistolAim") : FName("PistolHip");
+		}*/
 		AnimInstance->Montage_JumpToSection(SectionName);
 	}
 }
@@ -181,8 +213,11 @@ void AShooterCharacter::PlayReloadMontage()
 		FName SectionName;
 		switch (CombatComponent->EquippedWeapon->GetWeaponType())
 		{
-		case EWeaponType::EWT_AssaultRiffle:
+		case EWeaponType::EWT_AssaultRifle:
 			SectionName = FName("Rifle");
+			break;
+		case EWeaponType::EWT_Pistol:
+			SectionName = FName("Pistol");
 			break;
 		}
 		AnimInstance->Montage_JumpToSection(SectionName);
@@ -272,10 +307,18 @@ void AShooterCharacter::PlayHitReactMontage()
 	}
 }
 
-void AShooterCharacter::OnRep_Health()
+void AShooterCharacter::OnRep_Health(float LastHealth)
 {
 	UpdateHUDHealth();
-	PlayHitReactMontage();
+	if (Health < LastHealth)
+	{
+		PlayHitReactMontage();
+	}
+}
+
+void AShooterCharacter::OnRep_Shield(float LastShield)
+{
+	UpdateHUDShield();
 }
 
 void AShooterCharacter::SetOverlappingWeapon(AWeapon* Weapon)
@@ -452,8 +495,27 @@ void AShooterCharacter::AimOffset(float DeltaTime)
 
 void AShooterCharacter::ReceiveDamage(AActor* DamageActor, float Damage, const UDamageType* DamageType, AController* InstigatorController, AActor* DamageCauser)
 {
-	Health = FMath::Clamp(Health - Damage, 0.f, MaxHealth);
+	if (bElimmed) return;
+
+	float DamageToHealth = Damage;
+	if (Shield > 0.f)
+	{
+		if (Shield >= Damage)
+		{
+			Shield = FMath::Clamp(Shield - Damage, 0, MaxShield);
+			DamageToHealth = 0.f;
+		}
+		else
+		{
+			Shield = 0.f;
+			DamageToHealth = FMath::Clamp(DamageToHealth - Shield, 0, Damage);
+		}
+	}
+	
+	Health = FMath::Clamp(Health - DamageToHealth, 0.f, MaxHealth);
+
 	UpdateHUDHealth();
+	UpdateHUDShield();
 	PlayHitReactMontage();
 
 	if (Health <= 0.f)
@@ -466,7 +528,15 @@ void AShooterCharacter::ReceiveDamage(AActor* DamageActor, float Damage, const U
 				ShooterPlayerController = Cast<AShooterPlayerController>(Controller);
 			}
 			AShooterPlayerController* AttackerController = Cast<AShooterPlayerController>(InstigatorController);
-			ShooterGameMode->PlayerEliminated(this, ShooterPlayerController, AttackerController);
+			if (AttackerController == nullptr)
+			{
+				AShooterAIController* AttackerAIController = Cast<AShooterAIController>(InstigatorController);
+				ShooterGameMode->PlayerEliminatedByEnemy(this, ShooterPlayerController, AttackerAIController);
+			}
+			else
+			{
+				ShooterGameMode->PlayerEliminated(this, ShooterPlayerController, AttackerController);
+			}
 		}
 	}
 }

@@ -34,6 +34,8 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void FinishReloading();
 
+	void PickupAmmo(EWeaponType WeaponType, int32 AmmoAmount);
+
 protected:
 	virtual void BeginPlay() override;
 
@@ -64,6 +66,8 @@ protected:
 
 	void HandleReload();
 	int32 AmountToReload();
+
+	void UpdateCarriedAmmo();
 
 private:
 	TObjectPtr<AShooterCharacter> Character;
@@ -106,7 +110,13 @@ private:
 	TMap<EWeaponType, int32> CarriedAmmoMap;
 
 	UPROPERTY(EditAnywhere)
-	int32 StartingARAmmo = 30;
+	int32 MaxCarriedAmmo = 300;
+
+	UPROPERTY(EditAnywhere)
+	int32 StartingARAmmo = 0;
+
+	UPROPERTY(EditAnywhere)
+	int32 StartingPistolAmmo = 0;
 
 	void InitializeCarriedAmmo();
 
