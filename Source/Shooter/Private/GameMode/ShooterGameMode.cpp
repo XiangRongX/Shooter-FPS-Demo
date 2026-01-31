@@ -8,6 +8,8 @@
 #include "GameFramework/PlayerStart.h"
 #include "Character/ShooterPlayerState.h"
 #include "Character/ShooterGameState.h"
+#include "Enemy/EnemyStart.h"
+#include "Enemy/ShooterEnemy.h"
 
 namespace MatchState
 {
@@ -37,6 +39,7 @@ void AShooterGameMode::Tick(float DeltaTime)
 		if (CountdownTime <= 0.f)
 		{
 			StartMatch();
+			SpawnEnemies();
 		}
 	}
 	else if (MatchState == MatchState::InProgress)
@@ -55,6 +58,24 @@ void AShooterGameMode::Tick(float DeltaTime)
 			RestartGame();
 		}
 	}
+}
+
+AActor* AShooterGameMode::ChoosePlayerStart_Implementation(AController* Player)
+{
+	APawn* PawnToSpawn = Player->GetPawn();
+
+	FName TargetTag = Player->IsPlayerController() ? FName("PlayerStart") : FName("EnemyStart");
+
+	TArray<AActor*> FoundStarts;
+	UGameplayStatics::GetAllActorsOfClassWithTag(GetWorld(), APlayerStart::StaticClass(), TargetTag, FoundStarts);
+
+	if (FoundStarts.Num() > 0)
+	{
+		int32 RandomIndex = FMath::RandRange(0, FoundStarts.Num() - 1);
+		return FoundStarts[RandomIndex];
+	}
+
+	return Super::ChoosePlayerStart_Implementation(Player);
 }
 
 void AShooterGameMode::OnMatchStateSet()
@@ -96,6 +117,38 @@ void AShooterGameMode::PlayerEliminated(AShooterCharacter* ElimmedCharacter, ASh
 	}
 }
 
+void AShooterGameMode::PlayerEliminatedByEnemy(AShooterCharacter* ElimmedCharacter, AShooterPlayerController* VictimController, AShooterAIController* AttackerController)
+{
+	if (AttackerController == nullptr) return;
+	if (VictimController == nullptr || VictimController->PlayerState == nullptr) return;
+
+	AShooterPlayerState* VictimPlayerState = VictimController ? Cast<AShooterPlayerState>(VictimController->PlayerState) : nullptr;
+
+	if (VictimPlayerState)
+	{
+		VictimPlayerState->AddToDefeats(1);
+	}
+
+	if (ElimmedCharacter)
+	{
+		ElimmedCharacter->Elim();
+	}
+}
+
+void AShooterGameMode::EnemyEliminated(AShooterEnemy* ElimmedCharacter, AShooterAIController* VictimController, AShooterPlayerController* AttackerController)
+{
+	if (AttackerController == nullptr || AttackerController->PlayerState == nullptr) return;
+	if (VictimController == nullptr) return;
+
+	AShooterPlayerState* AttackerPlayerState = AttackerController ? Cast<AShooterPlayerState>(AttackerController->PlayerState) : nullptr;
+	AShooterGameState* ShooterGameState = GetGameState<AShooterGameState>();
+	if (AttackerPlayerState && ShooterGameState)
+	{
+		AttackerPlayerState->AddToScore(1.f);
+		ShooterGameState->UpdateTopScore(AttackerPlayerState);
+	}
+}
+
 void AShooterGameMode::RequestRespawn(ACharacter* ElimmedCharacter, AController* ElimmedController)
 {
 	if(ElimmedCharacter)
@@ -106,10 +159,54 @@ void AShooterGameMode::RequestRespawn(ACharacter* ElimmedCharacter, AController*
 	if(ElimmedController)
 	{
 		TArray<AActor*> PlayerStarts;
-		UGameplayStatics::GetAllActorsOfClass(this, APlayerStart::StaticClass(), PlayerStarts);
+		UGameplayStatics::GetAllActorsOfClassWithTag(this, PlayerStartClass, FName("PlayerStart"), PlayerStarts);
 		int32 Selection = FMath::RandRange(0, PlayerStarts.Num() - 1);
 		RestartPlayerAtPlayerStart(ElimmedController, PlayerStarts[Selection]);
 	}
+}
+
+void AShooterGameMode::EnemyRespawn(ACharacter* ElimmedCharacter, AController* ElimmedController)
+{
+	if (ElimmedController)
+	{
+		TArray<AActor*> EnemyStarts;
+		UGameplayStatics::GetAllActorsOfClass(this, EnemyStartClass, EnemyStarts);
+		int32 Selection = FMath::RandRange(0, EnemyStarts.Num() - 1);
+		AActor* SpawnPoint = EnemyStarts[Selection];
+		FActorSpawnParameters SpawnParams;
+		SpawnParams.Instigator = GetInstigator();
+		AShooterEnemy* NewEnemy = GetWorld()->SpawnActor<AShooterEnemy>(
+			EnemyClass,
+			SpawnPoint->GetActorLocation(),
+			SpawnPoint->GetActorRotation(),
+			SpawnParams
+		);
+		if (NewEnemy)
+		{
+			ElimmedController->Possess(NewEnemy);
+		}
+	}
+}
+
+void AShooterGameMode::SpawnEnemies()
+{
+	TArray<AActor*> EnemyStarts;
+	UGameplayStatics::GetAllActorsOfClass(this, AEnemyStart::StaticClass(), EnemyStarts);
+	for (int i = 0; i < NumEnemies; i++)
+	{
+		int32 Selection = FMath::RandRange(0, EnemyStarts.Num() - 1);
+		FActorSpawnParameters SpawnParams;
+		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+		AActor* SelectedSpawnPoint = EnemyStarts[Selection];
+		FVector SpawnLocation = SelectedSpawnPoint->GetActorLocation();
+		FRotator SpawnRotation = SelectedSpawnPoint->GetActorRotation();
+		AShooterEnemy* NewEnemy = GetWorld()->SpawnActor<AShooterEnemy>(EnemyClass, SpawnLocation, SpawnRotation, SpawnParams);
+		if (NewEnemy)
+		{
+			NewEnemy->SpawnDefaultController();
+		}
+	}
+	
 }
 
 

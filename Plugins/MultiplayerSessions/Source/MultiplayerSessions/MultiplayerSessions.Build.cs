@@ -28,7 +28,10 @@ public class MultiplayerSessions : ModuleRules
 				"Core",
 				"OnlineSubsystem",
                 "OnlineSubsystemSteam",
-				"UMG"
+                "OnlineSubsystemUtils", // 5.6 很多 Session 处理函数移到了这里
+				"Networking",           // 确保底层 Socket 可用
+				"Sockets",
+                "UMG"
 				// ... add other public dependencies that you statically link with here ...
 			}
 			);

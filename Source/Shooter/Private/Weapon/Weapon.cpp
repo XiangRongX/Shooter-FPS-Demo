@@ -10,11 +10,13 @@
 #include "Animation/AnimationAsset.h"
 #include "Weapon/Casing.h"
 #include "Engine/SkeletalMeshSocket.h"
+#include "Sound/SoundCue.h"
 
 AWeapon::AWeapon()
 {
 	PrimaryActorTick.bCanEverTick = false;
 	bReplicates = true;
+	SetReplicateMovement(true);
 
 	WeaponMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("WeaponMesh"));
 	SetRootComponent(WeaponMesh);
@@ -22,6 +24,16 @@ AWeapon::AWeapon()
 	WeaponMesh->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Block);
 	WeaponMesh->SetCollisionResponseToChannel(ECollisionChannel::ECC_Pawn, ECollisionResponse::ECR_Ignore);
 	WeaponMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	WeaponMesh->SetOwnerNoSee(true);
+	WeaponMesh->bCastHiddenShadow = true;
+
+	WeaponMesh1P = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("WeaponMesh1P"));
+	WeaponMesh1P->SetupAttachment(RootComponent);
+	WeaponMesh1P->SetOnlyOwnerSee(true);
+	WeaponMesh1P->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	WeaponMesh1P->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Ignore);
+	WeaponMesh1P->SetCanEverAffectNavigation(false);
+	WeaponMesh1P->CastShadow = false;
 
 	AreaSphere = CreateDefaultSubobject<USphereComponent>(TEXT("AreaSphere"));
 	AreaSphere->SetupAttachment(RootComponent);
@@ -85,7 +97,17 @@ void AWeapon::Fire(const FVector& HitTarget)
 {
 	if(FireAnimation)
 	{
-		WeaponMesh->PlayAnimation(FireAnimation, false);
+		if (APawn* OwningPawn = Cast<APawn>(GetOwner()))
+		{
+			if (OwningPawn->IsLocallyControlled())
+			{
+				WeaponMesh1P->PlayAnimation(FireAnimation, false);
+			}
+			else
+			{
+				WeaponMesh->PlayAnimation(FireAnimation, false);
+			}
+		}
 	}
 
 	if (CasingClass)

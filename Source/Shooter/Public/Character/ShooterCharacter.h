@@ -15,6 +15,7 @@ class UInputAction;
 struct FInputActionValue;
 class AWeapon;
 class UCombatComponent;
+class UBuffComponent;
 class UAnimMontage;
 class AShooterPlayerController;
 class AShooterPlayerState;
@@ -45,19 +46,28 @@ public:
 	AWeapon* GetEquippedWeapon() const;
 	FVector GetHitTarget() const;
 	ECombatState GetCombatState() const;
+	void UpdateHUDHealth();
+	void UpdateHUDShield();
 	
 	FORCEINLINE float GetAO_Yaw() const { return AO_Yaw; }
 	FORCEINLINE float GetAO_Pitch() const { return AO_Pitch; }
 	FORCEINLINE ETurningInPlace GetTurningInPlace() const { return TurningInPlace; }
 	FORCEINLINE bool GetElimmed() const { return bElimmed; }
+	FORCEINLINE void SetHealth(float Amount) { Health = Amount; }
 	FORCEINLINE float GetHealth() const { return Health; }
 	FORCEINLINE float GetMaxHealth() const { return MaxHealth; }
+	FORCEINLINE void SetShield(float Amount) { Shield = Amount; }
+	FORCEINLINE float GetShield() const { return Shield; }
+	FORCEINLINE float GetMaxShield() const { return MaxShield; }
+	FORCEINLINE UCombatComponent* GetCombatComponent()const { return CombatComponent; }
+	FORCEINLINE UBuffComponent* GetBuffComponent()const { return BuffComponent; }
+	FORCEINLINE USkeletalMeshComponent* GetFirstPersonMesh()const { return FirstPersonMesh; }
+	FORCEINLINE UCameraComponent* GetCamera()const { return FirstPersonCamera; }
 
 protected:
 	virtual void BeginPlay() override;
 	virtual void Destroyed() override;
 
-	void UpdateHUDHealth();
 	void PollInit();
 
 	void Move(const FInputActionValue& Value);
@@ -118,6 +128,9 @@ private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UCombatComponent> CombatComponent;
 
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<UBuffComponent> BuffComponent;
+
 	UFUNCTION()
 	void OnRep_OverlappingWeapon(AWeapon* LastWeapon);
 
@@ -154,7 +167,16 @@ private:
 	float Health = 100.f;
 
 	UFUNCTION()
-	void OnRep_Health();
+	void OnRep_Health(float LastShield);
+
+	UPROPERTY(EditAnywhere, Category = "Player Stats")
+	float MaxShield = 100.f;
+
+	UPROPERTY(ReplicatedUsing = OnRep_Shield, VisibleAnywhere, Category = "Player Stats")
+	float Shield = 0.f;
+
+	UFUNCTION()
+	void OnRep_Shield(float LastShield);
 
 	bool bElimmed = false;
 	FTimerHandle ElimTimer;

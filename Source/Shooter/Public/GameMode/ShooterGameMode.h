@@ -7,7 +7,11 @@
 #include "ShooterGameMode.generated.h"
 
 class AShooterCharacter;
+class AShooterEnemy;
 class AShooterPlayerController;
+class AShooterAIController;
+class AEnemyStart;
+class APlayerStart;
 
 namespace MatchState
 {
@@ -25,8 +29,13 @@ class SHOOTER_API AShooterGameMode : public AGameMode
 public:
 	AShooterGameMode();
 	virtual void Tick(float DeltaTime) override;
+	AActor* ChoosePlayerStart_Implementation(AController* Player) override;
 	virtual void PlayerEliminated(AShooterCharacter* ElimmedCharacter, AShooterPlayerController* VictimController, AShooterPlayerController* AttackerController);
+	virtual void PlayerEliminatedByEnemy(AShooterCharacter* ElimmedCharacter, AShooterPlayerController* VictimController, AShooterAIController* AttackerController);
+	virtual void EnemyEliminated(AShooterEnemy* ElimmedCharacter, AShooterAIController* VictimController, AShooterPlayerController* AttackerController);
 	virtual void RequestRespawn(ACharacter* ElimmedCharacter, AController* ElimmedController);
+	virtual void EnemyRespawn(ACharacter* ElimmedCharacter, AController* ElimmedController);
+	void SpawnEnemies();
 
 	FORCEINLINE float GetCountdownTime() { return CountdownTime; }
 
@@ -40,6 +49,18 @@ public:
 	float CooldownTime = 10.f;
 
 	float LevelStartingTime = 0.f;
+
+	UPROPERTY(EditDefaultsOnly)
+	int32 NumEnemies = 3;
+
+	UPROPERTY(EditDefaultsOnly)
+	TSubclassOf<AShooterEnemy> EnemyClass;
+
+	UPROPERTY(EditDefaultsOnly)
+	TSubclassOf<APlayerStart> PlayerStartClass;
+
+	UPROPERTY(EditDefaultsOnly)
+	TSubclassOf<AEnemyStart> EnemyStartClass;
 
 protected:
 	virtual void BeginPlay() override;

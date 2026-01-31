@@ -71,7 +71,39 @@ void UShooterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 			RightHandRotation = FMath::RInterpTo(RightHandRotation, LookAtRotation, DeltaSeconds, 30.f);
 		}
 	}
+	if (bWeaponEquipped && EquippedWeapon && EquippedWeapon->GetWeaponMesh1P() && ShooterCharacter->GetFirstPersonMesh())
+	{
+		LeftHandTransform1P = EquippedWeapon->GetWeaponMesh1P()->GetSocketTransform(FName("LeftHandSocket1P"), ERelativeTransformSpace::RTS_World);
+		FVector OutPosition;
+		FRotator OutRotation;
+		ShooterCharacter->GetFirstPersonMesh()->TransformToBoneSpace(FName("hand_r"), LeftHandTransform1P.GetLocation(), FRotator::ZeroRotator, OutPosition, OutRotation);
+		LeftHandTransform1P.SetLocation(OutPosition);
+		LeftHandTransform1P.SetRotation(FQuat(OutRotation));
+
+		if (ShooterCharacter->IsLocallyControlled())
+		{
+			bLocallyControlled = true;
+			FTransform RightHandTransform = EquippedWeapon->GetWeaponMesh1P()->GetSocketTransform(FName("hand_r"), ERelativeTransformSpace::RTS_World);
+			FRotator LookAtRotation = UKismetMathLibrary::FindLookAtRotation(RightHandTransform.GetLocation(), RightHandTransform.GetLocation() + (RightHandTransform.GetLocation() - ShooterCharacter->GetHitTarget()));
+			RightHandRotation1P = FMath::RInterpTo(RightHandRotation1P, LookAtRotation, DeltaSeconds, 30.f);
+		}
+	}
 
 	bUseFABRIK = ShooterCharacter->GetCombatState() != ECombatState::ECS_Reloading;
 	bUseAimOffsets = ShooterCharacter->GetCombatState() != ECombatState::ECS_Reloading;
+
+	if (bWeaponEquipped && ShooterCharacter->GetEquippedWeapon())
+	{
+		EWeaponType WeaponType = ShooterCharacter->GetEquippedWeapon()->GetWeaponType();
+		switch (WeaponType)
+		{
+		case EWeaponType::EWT_AssaultRifle:
+			WeaponTypeIndex = 0;
+			break;
+		case EWeaponType::EWT_Pistol:
+			WeaponTypeIndex = 1;
+			break;
+
+		}
+	}
 }

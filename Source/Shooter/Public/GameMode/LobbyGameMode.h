@@ -17,4 +17,8 @@ class SHOOTER_API ALobbyGameMode : public AGameModeBase
 public:
 	virtual void PostLogin(APlayerController* NewPlayer) override;
 	virtual void Logout(AController* Existing) override;
+
+private:
+	int32 RequiredPlayers = 2;
+	FTimerHandle JumpTimerHandle;
 };
