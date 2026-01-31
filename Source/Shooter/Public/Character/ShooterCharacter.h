@@ -62,6 +62,7 @@ public:
 	FORCEINLINE UCombatComponent* GetCombatComponent()const { return CombatComponent; }
 	FORCEINLINE UBuffComponent* GetBuffComponent()const { return BuffComponent; }
 	FORCEINLINE USkeletalMeshComponent* GetFirstPersonMesh()const { return FirstPersonMesh; }
+	FORCEINLINE UCameraComponent* GetCamera()const { return FirstPersonCamera; }
 
 protected:
 	virtual void BeginPlay() override;

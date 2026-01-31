@@ -32,6 +32,12 @@ public:
 	void OnMatchStateSet(FName State);
 	void HandleMatchHasStarted();
 	void HandleCooldown();
+	
+	UFUNCTION(Client, Unreliable)
+	void ClientShowLobbyTips(bool bShow);
+
+	UPROPERTY(EditAnywhere)
+	TSubclassOf<UUserWidget> TipWidgetClass;
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual void OnPossess(APawn* InPawn) override;
@@ -101,4 +107,7 @@ private:
 	float HUDMaxShield;
 	float HUDScore;
 	int32 HUDDefeats;
+
+	UPROPERTY()
+	UUserWidget* TipWidget;
 };

@@ -104,4 +104,7 @@ private:
 
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<ACasing> CasingClass;
+
+	FTimerHandle RespawnTimer;
+	void BindRespawnTimerFinished();
 };

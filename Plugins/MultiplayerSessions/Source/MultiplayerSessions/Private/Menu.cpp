@@ -7,6 +7,7 @@
 #include "OnlineSessionSettings.h"
 #include "Interfaces/OnlineSessionInterface.h"
 #include "OnlineSubsystem.h"
+#include "Components/EditableText.h"
 
 void UMenu::MenuSetup(int NumOfPublicConnections, FString TypeOfMatch, FString LobbyPath)
 {

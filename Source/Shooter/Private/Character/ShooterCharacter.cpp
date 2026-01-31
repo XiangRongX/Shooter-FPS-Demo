@@ -39,8 +39,8 @@ AShooterCharacter::AShooterCharacter()
 	GetMesh()->SetCollisionObjectType(ECC_SkeletalMesh);
 
 	FirstPersonCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FirstPersonCamera"));
-	FirstPersonCamera->SetupAttachment(GetMesh());
-	FirstPersonCamera->SetRelativeLocation(FVector(-10.f, 0.f, 60.f));
+	FirstPersonCamera->SetupAttachment(GetCapsuleComponent());
+	//FirstPersonCamera->SetRelativeLocation(FVector(-10.f, 0.f, 60.f));
 	FirstPersonCamera->bUsePawnControlRotation = true;
 
 	FirstPersonMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("FirstPersonMesh"));
@@ -48,7 +48,7 @@ AShooterCharacter::AShooterCharacter()
 	FirstPersonMesh->SetupAttachment(FirstPersonCamera);
 	FirstPersonMesh->bCastDynamicShadow = false;
 	FirstPersonMesh->CastShadow = false;
-	FirstPersonMesh->SetRelativeLocation(FVector(-30.f, 0.f, -150.f));
+	//FirstPersonMesh->SetRelativeLocation(FVector(-30.f, 0.f, -150.f));
 	FirstPersonMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
 	CombatComponent = CreateDefaultSubobject<UCombatComponent>(TEXT("CombatComponent"));
@@ -178,9 +178,11 @@ void AShooterCharacter::PlayFireMontage(bool bAiming)
 	if (CombatComponent == nullptr || CombatComponent->EquippedWeapon == nullptr) return;
 
 	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
-	if(AnimInstance && FireWeaponMontage)
+	UAnimInstance* AnimInstance1P = GetFirstPersonMesh()->GetAnimInstance();
+	if(AnimInstance && AnimInstance1P && FireWeaponMontage)
 	{
 		AnimInstance->Montage_Play(FireWeaponMontage);
+		AnimInstance1P->Montage_Play(FireWeaponMontage);
 		FName SectionName = bAiming ? FName("RifleAim") : FName("RifleHip");
 		/*switch (CombatComponent->EquippedWeapon->GetWeaponType())
 		{
@@ -190,6 +192,7 @@ void AShooterCharacter::PlayFireMontage(bool bAiming)
 			SectionName = bAiming ? FName("PistolAim") : FName("PistolHip");
 		}*/
 		AnimInstance->Montage_JumpToSection(SectionName);
+		AnimInstance1P->Montage_JumpToSection(SectionName);
 	}
 }
 
@@ -207,9 +210,11 @@ void AShooterCharacter::PlayReloadMontage()
 	if (CombatComponent == nullptr || CombatComponent->EquippedWeapon == nullptr) return;
 
 	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
-	if (AnimInstance && ReloadMontage)
+	UAnimInstance* AnimInstance1P = GetFirstPersonMesh()->GetAnimInstance();
+	if (AnimInstance && AnimInstance1P && ReloadMontage)
 	{
 		AnimInstance->Montage_Play(ReloadMontage);
+		AnimInstance1P->Montage_Play(ReloadMontage);
 		FName SectionName;
 		switch (CombatComponent->EquippedWeapon->GetWeaponType())
 		{
@@ -221,6 +226,7 @@ void AShooterCharacter::PlayReloadMontage()
 			break;
 		}
 		AnimInstance->Montage_JumpToSection(SectionName);
+		AnimInstance1P->Montage_JumpToSection(SectionName);
 	}
 }
 
@@ -418,7 +424,7 @@ void AShooterCharacter::CrouchButtonPressed()
 
 void AShooterCharacter::AimButtonPressed()
 {
-	if (CombatComponent)
+	if (CombatComponent && CombatComponent->EquippedWeapon)
 	{
 		CombatComponent->SetAiming(true);
 	}
@@ -427,7 +433,7 @@ void AShooterCharacter::AimButtonPressed()
 void AShooterCharacter::AimButtonReleased()
 {
 	
-	if (CombatComponent)
+	if (CombatComponent && CombatComponent->EquippedWeapon)
 	{
 		CombatComponent->SetAiming(false);
 	}

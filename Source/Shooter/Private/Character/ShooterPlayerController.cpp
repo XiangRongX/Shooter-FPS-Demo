@@ -450,3 +450,16 @@ void AShooterPlayerController::HandleCooldown()
 		FlushPressedKeys();
 	}
 }
+
+void AShooterPlayerController::ClientShowLobbyTips_Implementation(bool bShow)
+{
+	if (bShow) {
+		if (!TipWidget && TipWidgetClass) {
+			TipWidget = CreateWidget<UUserWidget>(this, TipWidgetClass);
+		}
+		if (TipWidget) TipWidget->AddToViewport();
+	}
+	else {
+		if (TipWidget) TipWidget->RemoveFromParent();
+	}
+}

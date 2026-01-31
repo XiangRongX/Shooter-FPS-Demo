@@ -93,7 +93,19 @@ private:
 	float CrosshairVelocityFactor;
 	float CrosshairInAirFactor;
 	float CrosshairShootingFactor;
+	float CrosshairAimFactor;
 	FHUDPackage HUDPackage;
+
+	float DefaultFOV;
+	float CurrentFOV;
+
+	UPROPERTY(EditAnywhere)
+	float ZoomedFOV = 70.f;
+
+	UPROPERTY(EditAnywhere)
+	float ZoomInterpSpeed = 20.f;
+
+	void InterpFOV(float DeltaTime);
 
 	FTimerHandle FireTimer;
 	void StartFireTimer();

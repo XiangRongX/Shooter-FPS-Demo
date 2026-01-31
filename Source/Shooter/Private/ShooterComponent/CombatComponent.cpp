@@ -14,6 +14,7 @@
 #include "UI/ShooterHUD.h"
 #include "TimerManager.h"
 #include "Sound/SoundCue.h"
+#include "Camera/CameraComponent.h"
 
 UCombatComponent::UCombatComponent()
 {
@@ -30,6 +31,12 @@ void UCombatComponent::BeginPlay()
 	{
 		Character->GetCharacterMovement()->MaxWalkSpeed = BaseWalkSpeed;
 
+		if (Character->GetCamera())
+		{
+			DefaultFOV = Character->GetCamera()->FieldOfView;
+			CurrentFOV = DefaultFOV;
+		}
+
 		if (Character->HasAuthority())
 		{
 			InitializeCarriedAmmo();
@@ -41,13 +48,14 @@ void UCombatComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActo
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-	SetHUDCrosshairs(DeltaTime);
-
 	if (Character && Character->IsLocallyControlled())
 	{
 		FHitResult HitResult;
 		TraceUnderCrosshairs(HitResult);
 		HitTarget = HitResult.ImpactPoint;
+
+		SetHUDCrosshairs(DeltaTime);
+		InterpFOV(DeltaTime);
 	}
 }
 
@@ -120,11 +128,15 @@ void UCombatComponent::TraceUnderCrosshairs(FHitResult& TraceHitResult)
 		FVector Start = CrosshairWorldPosition;
 		Start += CrosshairWorldDirection * 50.f;
 		FVector End = Start + CrosshairWorldDirection * TRACE_LENGTH;
+		FCollisionQueryParams QueryParams;
+		QueryParams.AddIgnoredActor(Character);
+		QueryParams.AddIgnoredActor(EquippedWeapon);
 		GetWorld()->LineTraceSingleByChannel(
 			TraceHitResult,
 			Start,
 			End,
-			ECC_Visibility
+			ECC_Visibility,
+			QueryParams
 		);
 		if(!TraceHitResult.bBlockingHit)
 		{
@@ -188,11 +200,39 @@ void UCombatComponent::SetHUDCrosshairs(float DeltaTime)
 		CrosshairInAirFactor = FMath::FInterpTo(CrosshairInAirFactor, 0.f, DeltaTime, 30.f);
 	}
 
+	if (bAiming)
+	{
+		CrosshairAimFactor = FMath::FInterpTo(CrosshairAimFactor, 0.58f, DeltaTime, 30.f);
+	}
+	else
+	{
+		CrosshairAimFactor = FMath::FInterpTo(CrosshairAimFactor, 0.f, DeltaTime, 30.f);
+	}
+
 	CrosshairShootingFactor = FMath::FInterpTo(CrosshairShootingFactor, 0.f, DeltaTime, 40.f);
 
-	HUDPackage.CrosshairSpread = 0.5f + CrosshairVelocityFactor + CrosshairInAirFactor + CrosshairShootingFactor;
+	HUDPackage.CrosshairSpread = 0.5f + CrosshairVelocityFactor + CrosshairInAirFactor + CrosshairShootingFactor - CrosshairAimFactor;
 
 	HUD->SetHUDPackage(HUDPackage);
+}
+
+void UCombatComponent::InterpFOV(float DeltaTime)
+{
+	if (!EquippedWeapon) return;
+
+	if (bAiming)
+	{
+		CurrentFOV = FMath::FInterpTo(CurrentFOV, EquippedWeapon->GetZoomedFOV(), DeltaTime, EquippedWeapon->GetZoomInterpSpeed());
+	}
+	else
+	{
+		CurrentFOV = FMath::FInterpTo(CurrentFOV, DefaultFOV, DeltaTime, ZoomInterpSpeed);
+	}
+
+	if (Character && Character->GetCamera())
+	{
+		Character->GetCamera()->SetFieldOfView(CurrentFOV);
+	}
 }
 
 void UCombatComponent::StartFireTimer()
@@ -242,7 +282,8 @@ void UCombatComponent::OnRep_CarriedAmmo()
 
 void UCombatComponent::InitializeCarriedAmmo()
 {
-	CarriedAmmoMap.Emplace(EWeaponType::EWT_AssaultRiffle, StartingARAmmo);
+	CarriedAmmoMap.Emplace(EWeaponType::EWT_AssaultRifle, StartingARAmmo);
+	CarriedAmmoMap.Emplace(EWeaponType::EWT_Pistol, StartingPistolAmmo);
 }
 
 void UCombatComponent::ServerFire_Implementation(const FVector_NetQuantize& TraceHitTarget)
@@ -288,6 +329,15 @@ void UCombatComponent::EquipWeapon(AWeapon* WeaponToEquip)
 	{
 		HandSocket->AttachActor(EquippedWeapon, Character->GetMesh());
 	}
+	if (Character->GetFirstPersonMesh())
+	{
+		const USkeletalMeshSocket* HandSocket1P = Character->GetFirstPersonMesh()->GetSocketByName("RightHandSocket");
+		if (HandSocket1P)
+		{
+			EquippedWeapon->GetWeaponMesh1P()->AttachToComponent(Character->GetFirstPersonMesh(), FAttachmentTransformRules::SnapToTargetIncludingScale, "RightHandSocket");
+		}
+	}
+
 	EquippedWeapon->SetOwner(Character);
 	EquippedWeapon->SetHUDAmmo();
 
@@ -333,6 +383,19 @@ void UCombatComponent::FinishReloading()
 	if (bFireButtonPressed)
 	{
 		Fire();
+	}
+}
+
+void UCombatComponent::PickupAmmo(EWeaponType WeaponType, int32 AmmoAmount)
+{
+	if (CarriedAmmoMap.Contains(WeaponType))
+	{
+		CarriedAmmoMap[WeaponType] = FMath::Clamp(CarriedAmmoMap[WeaponType] + AmmoAmount, 0, MaxCarriedAmmo);
+		UpdateCarriedAmmo();
+	}
+	if (EquippedWeapon && EquippedWeapon->IsEmpty() && EquippedWeapon->GetWeaponType() == WeaponType)
+	{
+		Reload();
 	}
 }
 
@@ -383,6 +446,25 @@ int32 UCombatComponent::AmountToReload()
 	return 0;
 }
 
+void UCombatComponent::UpdateCarriedAmmo()
+{
+	if (EquippedWeapon == nullptr) return;
+
+	if (CarriedAmmoMap.Contains(EquippedWeapon->GetWeaponType()))
+	{
+		CarriedAmmo = CarriedAmmoMap[EquippedWeapon->GetWeaponType()];
+	}
+
+	if (Controller == nullptr)
+	{
+		Controller = Cast<AShooterPlayerController>(Character->Controller);
+	}
+	if (Controller)
+	{
+		Controller->SetHUDCarriedAmmo(CarriedAmmo);
+	}
+}
+
 void UCombatComponent::OnRep_CombatState()
 {
 	switch (CombatState)
@@ -408,6 +490,11 @@ void UCombatComponent::OnRep_EquippedWeapon()
 		if (HandSocket)
 		{
 			HandSocket->AttachActor(EquippedWeapon, Character->GetMesh());
+		}
+		if (Character->GetFirstPersonMesh())
+		{
+			const USkeletalMeshSocket* HandSocket1P = Character->GetFirstPersonMesh()->GetSocketByName("RightHandSocket");
+			EquippedWeapon->GetWeaponMesh1P()->AttachToComponent(Character->GetFirstPersonMesh(), FAttachmentTransformRules::SnapToTargetIncludingScale, "RightHandSocket");
 		}
 
 		if (EquippedWeapon->EquipSound)

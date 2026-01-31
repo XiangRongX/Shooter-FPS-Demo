@@ -117,8 +117,22 @@ void AShooterEnemy::ReceiveDamage(AActor* DamagedActor, float Damage, const UDam
 			}
 			AShooterPlayerController* AttackerController = Cast<AShooterPlayerController>(InstigatorController);
 			ShooterGameMode->EnemyEliminated(this, ShooterAIController, AttackerController);
-			ShooterGameMode->EnemyRespawn(this, ShooterAIController);
+			
+			UWorld* World = GetWorld();
+			if (World)
+			{
+				World->GetTimerManager().SetTimer(RespawnTimer, this, &AShooterEnemy::BindRespawnTimerFinished, 5.f);
+			}
 		}
+	}
+}
+
+void AShooterEnemy::BindRespawnTimerFinished()
+{
+	AShooterGameMode* ShooterGameMode = GetWorld()->GetAuthGameMode<AShooterGameMode>();
+	if (ShooterGameMode && HasAuthority())
+	{
+		ShooterGameMode->EnemyRespawn(this, ShooterAIController);
 	}
 }
 
@@ -130,7 +144,7 @@ void AShooterEnemy::Elim()
 
 	if (HasAuthority())
 	{
-		SetLifeSpan(5.0f);
+		SetLifeSpan(6.0f);
 	}
 }
 

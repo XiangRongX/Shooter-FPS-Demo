@@ -9,6 +9,7 @@
 
 class UButton;
 class UMultiplayerSessionsSubsystem;
+class UEditableText;
 
 /**
  * 
@@ -20,7 +21,7 @@ class MULTIPLAYERSESSIONS_API UMenu : public UUserWidget
 	
 public:
 	UFUNCTION(BlueprintCallable)
-	void MenuSetup(int NumOfPublicConnections = 4, FString TypeOfMatch = FString(TEXT("FreeForAll")), FString LobbyPath = FString(TEXT("/Game/Maps/Lobby")));
+	void MenuSetup(int NumOfPublicConnections = 4, FString TypeOfMatch = FString(TEXT("Shooter_XR_FreeForAll")), FString LobbyPath = FString(TEXT("/Game/Maps/Lobby")));
 
 protected:
 	virtual bool Initialize() override;
@@ -55,7 +56,11 @@ private:
 
 	TObjectPtr<UMultiplayerSessionsSubsystem> MultiplayerSessionsSubsystem;
 
+	UPROPERTY(BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
 	int32 NumPublicConnections = 4;
-	FString MatchType = TEXT("FreeForAll");
+
+	UPROPERTY(BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
+	FString MatchType = TEXT("Shooter_XR_FreeForAll");
+
 	FString PathToLobby = TEXT("");
 };
